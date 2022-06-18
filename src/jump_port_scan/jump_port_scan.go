@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"github.com/akamensky/argparse"
 	"github.com/ilightthings/jumptoolkit/src/inputparse"
+	"github.com/ilightthings/jumptoolkit/src/misc"
 	"log"
 	"net"
 	"os"
+	"sort"
 	"sync"
 	"time"
 )
@@ -17,23 +19,36 @@ import (
 //}
 
 type targetHost struct {
-	Ipaddr   string
-	Hostname string
-	Ports    []int
+	Ipaddr string
+	Ports  []int
+}
+
+type results struct {
+	ip   string
+	port int
 }
 
 type options struct {
-	hosts   []string
-	ports   []int
-	timeout int64 //Seconds
+	hosts      []string
+	ports      []int
+	maxConHost int
+	maxConPort int
+	timeout    int64 //Seconds
 }
 
 func main() {
 	parser := argparse.NewParser("jump_port_scan", "A quick, concurrent port scanner, that can be dropped onto a victim machine and ran.")
+
 	portarg := parser.String("p", "ports", &argparse.Options{Required: true, Help: "TCP ports to scan. Single port, range, comma seperated"})
 	hostarg := parser.String("t", "target", &argparse.Options{Required: true, Help: "IPv4 to target. Single, CIDR, comma seperated"})
-	timeoutarg := parser.Int("T", "timeout", &argparse.Options{Required: false, Default: .5, Help: "Timeout in seconds"})
+	timeoutarg := parser.Int("T", "timeout", &argparse.Options{Required: false, Default: 3, Help: "TCP Timeout in seconds"})
+	maxhostthreadarg := parser.Int("K", "host-threads", &argparse.Options{Required: false, Default: 100, Help: "Max concurrent hosts to scan"})
+	maxportthreadarg := parser.Int("k", "port-threads", &argparse.Options{Required: false, Default: 1000, Help: "Max concurrent ports per host to scan"})
+
 	err := parser.Parse(os.Args)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	valPorts, err := inputparse.ParsePorts(*portarg)
 	if err != nil {
@@ -44,75 +59,190 @@ func main() {
 		log.Fatal(err)
 	}
 
-	args := options{ports: valPorts,
-		hosts:   valHost,
-		timeout: int64(*timeoutarg)}
+	args := options{
+		ports:      valPorts,
+		hosts:      valHost,
+		timeout:    int64(*timeoutarg),
+		maxConHost: *maxhostthreadarg,
+		maxConPort: *maxportthreadarg,
+	}
 
+	if len(args.ports) > 1024 && len(args.hosts) > 100 {
+
+		totalTCPConnection := len(args.ports) * len(args.hosts)
+		totalThreads := args.maxConPort * args.maxConHost
+		fmt.Printf("Warning: %d TCP Connections will be attempted over a maximum of %d concurrent threads. Potentially inaccurate result. Ensure you have allocated the right resources for this scan.\n\n", totalTCPConnection, totalThreads)
+	}
+	printPreScanStats(&args)
+	fmt.Println("Starting Scan....")
 	startScan(&args)
 
 }
 
+//Print PreScan Stats
+func printPreScanStats(options *options) {
+	fmt.Printf("Extract Hosts: %d\nExtracted Ports: %d\n\nMax Concurrent Hosts: %d\nMax Concurrents Ports: %d\nMaximum Total Threads: %d\n\n", len(options.hosts), len(options.ports), options.maxConHost, options.maxConPort, options.maxConPort*options.maxConHost)
+
+}
+
 func startScan(options *options) {
-	var allhosts []targetHost
-	var WAIT sync.WaitGroup
+	returnresultschan := make(chan results)
+	hostschan := make(chan string)
+	var WgHost sync.WaitGroup
+	var threadcount int
+	var resultwg sync.WaitGroup
 
+	//Setup results Processor to handle multithread
+	resultwg.Add(1)
+	go processResults(returnresultschan, &resultwg)
+
+	//Limit workers to only what is needed
+	if len(options.hosts) < options.maxConHost {
+		threadcount = len(options.hosts)
+	} else {
+		threadcount = options.maxConHost
+	}
+
+	//Prepare worker for host scan
+	for t := 0; t != threadcount; t++ {
+		WgHost.Add(1)
+		go scanTarget(hostschan, &WgHost, options, returnresultschan)
+	}
+
+	//Send host to worker
 	for _, h := range options.hosts {
-
-		WAIT.Add(1)
-		go func(host string) {
-
-			defer WAIT.Done()
-
-			//fmt.Printf("starting host %s\n", host)
-			th := scanTarget(host, options)
-			allhosts = append(allhosts, th)
-		}(h)
-
+		hostschan <- h
 	}
-	WAIT.Wait()
 
-	for ahost := range allhosts {
-		if len(allhosts[ahost].Ports) != 0 {
-			fmt.Println(allhosts[ahost].Ipaddr)
-			for p := range allhosts[ahost].Ports {
-				fmt.Printf("\tPort %d Open\n", allhosts[ahost].Ports[p])
-			}
-		}
-	}
+	close(hostschan)
+	WgHost.Wait()
+	close(returnresultschan)
+	resultwg.Wait()
 	fmt.Printf("Scan Finished \n")
 
 }
 
-func scanTarget(host string, options *options) targetHost {
-	var t targetHost
-	t.Ipaddr = host
-	var wg sync.WaitGroup
-	for _, y := range options.ports {
+func scanTarget(hosts chan string, WgHost *sync.WaitGroup, options *options, returnresultschan chan results) {
+	for host := range hosts {
+		var WgPorts sync.WaitGroup
+		ports := make(chan int)
+		var maxthreadsPorts int
 
-		wg.Add(1)
-		go func(port int) {
+		//Limit workers to only what is needed
+		if len(options.ports) < options.maxConPort {
+			maxthreadsPorts = len(options.ports)
+		} else {
+			maxthreadsPorts = options.maxConPort
+		}
 
-			defer wg.Done()
-			status := scanport(port, host, options.timeout)
-			if status {
-				t.Ports = append(t.Ports, port)
-			}
-		}(y)
+		//Setup Worker to do work
+		for o := 0; o < maxthreadsPorts; o++ {
+			WgPorts.Add(1)
+			go scanport(ports, host, &WgPorts, options, returnresultschan)
+		}
+
+		//Send Work to workers
+		for _, p := range options.ports {
+			ports <- p
+		}
+
+		//When all work is sent, close channel
+		close(ports)
+
+		//Wait for all workers to be finished
+		WgPorts.Wait()
 
 	}
-	wg.Wait()
-	return t
+
+	defer WgHost.Done()
+
 }
 
-func scanport(port int, host string, timeout int64) bool {
+func scanport(ports chan int, host string, WgPorts *sync.WaitGroup, options *options, returnresultschan chan results) {
 
-	target := fmt.Sprintf("%s:%d", host, port)
-	//fmt.Printf("Testing %s\n", target)
+	for port := range ports {
+		target := fmt.Sprintf("%s:%d", host, port)
+		_, err := net.DialTimeout("tcp", target, time.Duration(options.timeout)*time.Second)
 
-	_, err := net.DialTimeout("tcp", target, time.Duration(timeout)*time.Second)
-	if err == nil {
-		fmt.Printf("Found %s\n", target)
-		return true
+		if err == nil {
+
+			//Build a result object and send it to processing
+			found := results{ip: host, port: port}
+			returnresultschan <- found
+
+			fmt.Printf("Found %s\n", target)
+		}
+
 	}
-	return false
+	WgPorts.Done()
+}
+
+func processResults(resultchan chan results, wg *sync.WaitGroup) {
+	var tally []targetHost
+	var aResult []results
+
+	for r := range resultchan {
+		//append result to result var to free up the channel quicker
+		aResult = append(aResult, r)
+	}
+
+	//Process results and consolidate
+	/*
+		Before: []results
+		{192.168.1.1 80}
+		{192.168.1.88 80}
+		{192.168.1.88 22}
+		{192.168.1.6 80}
+		{192.168.1.1 443}
+		{192.168.1.35 80}
+		{192.168.1.1 3389}
+
+		After: []targetHost
+		{192.168.1.1 [80 3389]}
+		{192.168.1.88 [22 80]}
+
+	*/
+	for _, x := range aResult {
+		found := false
+		for y, _ := range tally {
+			if x.ip == tally[y].Ipaddr {
+				tally[y].Ports = append(tally[y].Ports, x.port)
+				found = true
+
+			}
+		}
+
+		if !found {
+			z := targetHost{
+				Ipaddr: x.ip,
+				Ports:  []int{x.port},
+			}
+			tally = append(tally, z)
+
+		}
+
+	}
+
+	//Sort IP Address
+	sort.SliceStable(tally, func(i, j int) bool {
+		return misc.IP4toInt(tally[i].Ipaddr) < misc.IP4toInt(tally[j].Ipaddr)
+	})
+
+	fmt.Printf("\n###TOTAL RESULTS (%d):\n", len(tally))
+	for _, host := range tally {
+
+		//Sort ports
+		sort.SliceStable(host.Ports, func(i, j int) bool {
+			return host.Ports[i] < host.Ports[j]
+		})
+
+		if len(host.Ports) != 0 {
+			fmt.Printf("Host %s is up:\n", host.Ipaddr)
+			for _, port := range host.Ports {
+				fmt.Printf("\t%d/TCP open\n", port)
+			}
+		}
+	}
+	wg.Done()
+
 }
