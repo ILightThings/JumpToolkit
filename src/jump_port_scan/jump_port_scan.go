@@ -40,7 +40,7 @@ func main() {
 	parser := argparse.NewParser("jump_port_scan", "A quick, concurrent port scanner, that can be dropped onto a victim machine and ran.")
 
 	portarg := parser.String("p", "ports", &argparse.Options{Required: true, Help: "TCP ports to scan. Single port, range, comma seperated"})
-	hostarg := parser.String("t", "target", &argparse.Options{Required: true, Help: "IPv4 to target. Single, CIDR, comma seperated"})
+	hostarg := parser.String("t", "target", &argparse.Options{Required: true, Help: "IPv4 to target. Single, CIDR, comma seperated, if blank, use (29) common ports"})
 	timeoutarg := parser.Int("T", "timeout", &argparse.Options{Required: false, Default: 3, Help: "TCP Timeout in seconds"})
 	maxhostthreadarg := parser.Int("K", "host-threads", &argparse.Options{Required: false, Default: 100, Help: "Max concurrent hosts to scan"})
 	maxportthreadarg := parser.Int("k", "port-threads", &argparse.Options{Required: false, Default: 1000, Help: "Max concurrent ports per host to scan"})
@@ -50,10 +50,18 @@ func main() {
 		log.Fatal(err)
 	}
 
-	valPorts, err := inputparse.ParsePorts(*portarg)
-	if err != nil {
-		log.Fatal(err)
+	var valPorts []int
+	if *portarg == "" {
+		valPorts, err = inputparse.ParsePorts(*portarg)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+	} else {
+		valPorts = misc.CommonTCPPorts
+
 	}
+
 	valHost, err := inputparse.ParseHost(*hostarg)
 	if err != nil {
 		log.Fatal(err)

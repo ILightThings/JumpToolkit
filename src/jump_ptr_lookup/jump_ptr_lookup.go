@@ -5,12 +5,11 @@ import (
 	"github.com/akamensky/argparse"
 	"github.com/ilightthings/jumptoolkit/src/inputparse"
 	"github.com/ilightthings/jumptoolkit/src/misc"
-	"sort"
-	"strings"
-
 	"log"
 	"net"
 	"os"
+	"sort"
+	"strings"
 	"sync"
 )
 
