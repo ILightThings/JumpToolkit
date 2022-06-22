@@ -7,16 +7,46 @@ var (
 
 //LDAP SIDS
 var (
-	DomainAdminsGroup          = "512" //S-1-5-domain-512
-	EnterpriseAdminsGroup      = "519" //S-1-5-rootdomain-519
-	BuiltInAdministratorsGroup = "S-1-5-32-544"
+	DomainAdminsGroup          = [4]uint8{0, 2, 0, 0}  // S-1-5-domain-512 -> to hex -> to base 10 02 00
+	EnterpriseAdminsGroup      = [4]uint8{7, 2, 0, 0}  // S-1-5-rootdomain-519
+	BuiltInAdministratorsGroup = [4]uint8{32, 2, 0, 0} //"S-1-5-32-544"
 
-	BuiltInAdministrator = "500" //S-1-5-domain-500
-	krbtgt               = "502" //S-1-5-domain-502
+	BuiltInAdministrator = [4]uint8{244, 1, 0, 0} //S-1-5-domain-500
+	krbtgt               = [4]uint8{246, 1, 0, 0} //S-1-5-domain-502
 
-	DomainControllersGroup = "516" //S-1-5-domain-516
-	DomainComputersGroup   = "515" //S-1-5-domain-515
+	DomainControllersGroup = [4]uint8{4, 2, 0, 0} //S-1-5-domain-516
+	DomainComputersGroup   = [4]uint8{3, 2, 0, 0} //S-1-5-domain-515
 
+)
+
+//LDAP search Queries
+var (
+	AllEntries = "(cn=*)"
+)
+
+//TODO COMPLETE THIS
+
+//LDAP OID
+const (
+	OID_Domain               = 0x01
+	OID_Top                  = 0x02
+	OID_DomainDNS            = 0x04
+	OID_User                 = 0x08
+	OID_OrganizationalPerson = 0x10
+	OID_Person               = 0x20
+	OID_Computer             = 0x40
+	OID_Group                = 0x80
+)
+
+//LDAP OID Favourites
+const (
+	DomainControllerOID = 0x7A
+)
+
+const (
+	OS_WindowsServer2019SE = 0x01
+	OS_WindowServer2016SE  = 0x02
+	OS_WindowServer2012SE  = 0x04
 )
 
 //Naming and Catches
