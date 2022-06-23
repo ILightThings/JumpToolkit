@@ -12,7 +12,8 @@ var (
 	BuiltInAdministratorsGroup = [4]uint8{32, 2, 0, 0} //"S-1-5-32-544"
 
 	BuiltInAdministrator = [4]uint8{244, 1, 0, 0} //S-1-5-domain-500
-	krbtgt               = [4]uint8{246, 1, 0, 0} //S-1-5-domain-502
+	Krbtgt               = [4]uint8{246, 1, 0, 0} //S-1-5-domain-502
+	Guest                = [4]uint8{245, 1, 0, 0}
 
 	DomainControllersGroup = [4]uint8{4, 2, 0, 0} //S-1-5-domain-516
 	DomainComputersGroup   = [4]uint8{3, 2, 0, 0} //S-1-5-domain-515
@@ -41,6 +42,11 @@ const (
 //LDAP OID Favourites
 const (
 	DomainControllerOID = 0x7A
+)
+
+//LDAP Object Catagory
+const (
+	OBJCAT_Person = 0x01
 )
 
 const (

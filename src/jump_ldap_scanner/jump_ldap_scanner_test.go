@@ -1,4 +1,4 @@
-package jump_ldap_scanner
+package main
 
 import (
 	"fmt"
@@ -76,6 +76,12 @@ func TestExtractAllEntries(t *testing.T) {
 
 	for x := range p {
 		fmt.Println(p[x].DN)
+	}
+
+	r := SortResults(results.Entries)
+
+	for user := range r.Users {
+		fmt.Println(r.Users[user].DN)
 	}
 
 }

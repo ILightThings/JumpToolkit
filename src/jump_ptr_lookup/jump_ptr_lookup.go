@@ -168,5 +168,6 @@ func doLookupNG(ipAddrsChan chan string, WgIPAddr *sync.WaitGroup, options *opti
 			returnresultschan <- result
 		}
 	}
+
 	WgIPAddr.Done()
 }

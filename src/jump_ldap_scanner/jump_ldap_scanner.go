@@ -1,9 +1,12 @@
-package jump_ldap_scanner
+package main
 
 import (
 	"fmt"
+	"github.com/akamensky/argparse"
 	"github.com/go-ldap/ldap/v3"
 	"github.com/ilightthings/jumptoolkit/src/misc"
+	"log"
+	"os"
 	"strings"
 )
 
@@ -13,12 +16,20 @@ type SortedResults struct {
 	Groups              []*ldap.Entry
 	EntriesDescriptions []*ldap.Entry
 	HighValueGroups     BuiltInHighValueGroups
+	BuiltInAccounts     BuiltInAccounts
+	EntriesWithSPN      []*ldap.Entry
 }
 
 type BuiltInHighValueGroups struct {
 	DomainAdmins    *ldap.Entry
 	BuiltInAdmins   *ldap.Entry
 	EnterpriseAdmin *ldap.Entry
+}
+
+type BuiltInAccounts struct {
+	Krbtgt        *ldap.Entry
+	Administrator *ldap.Entry
+	Guest         *ldap.Entry
 }
 
 type Group struct {
@@ -39,6 +50,7 @@ type Options struct {
 	DomainSID    string
 }
 
+// example.local -> DC=example,DC=local
 func (o *Options) BuildCN() {
 	dcparts := strings.Split(strings.TrimSpace(o.domain), ".")
 	o.LDAPDomainDC = dcparts[0]
@@ -49,7 +61,49 @@ func (o *Options) BuildCN() {
 
 }
 
-func main() {}
+func main() {
+	parser := argparse.NewParser("jump_port_scan", "A quick, concurrent port scanner, that can be dropped onto a victim machine and ran.")
+
+	usernamearg := parser.String("u", "username", &argparse.Options{Required: true})
+	passwordarg := parser.String("p", "password", &argparse.Options{Required: true})
+	ldapdomainarg := parser.String("d", "domain", &argparse.Options{Required: true, Help: "DNS name of domain. Example: paperproducts.local "})
+	ldapiparg := parser.String("t", "ldap-server", &argparse.Options{Required: true, Help: "IP of LDAP Server"})
+	ldapportarg := parser.Int("P", "port", &argparse.Options{Required: false, Default: 389})
+
+	err := parser.Parse(os.Args)
+	if err != nil {
+		log.Fatal(err)
+	}
+	opt := Options{
+		username:   *usernamearg,
+		password:   *passwordarg,
+		LDAPIPaddr: *ldapiparg,
+		LDAPPort:   *ldapportarg,
+		domain:     *ldapdomainarg,
+	}
+	opt.BuildCN()
+
+	conn, err := DialLDAP(&opt)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = BindLDAP(conn, &opt)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer conn.Close()
+	results, err := ExtractAllEntries(conn, &opt)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	sorted := SortResults(results.Entries)
+	for x := range sorted.Users {
+		fmt.Println(sorted.Users[x].DN)
+	}
+
+}
 
 func DialLDAP(opt *Options) (*ldap.Conn, error) {
 	address := fmt.Sprintf("%s:%d", opt.LDAPIPaddr, opt.LDAPPort)
@@ -145,6 +199,7 @@ func SortResults(result []*ldap.Entry) SortedResults {
 	var results SortedResults
 	for _, entry := range result {
 		OID := 0
+		OBJCat := 0
 
 		for _, y := range entry.Attributes {
 			switch y.Name {
@@ -152,6 +207,7 @@ func SortResults(result []*ldap.Entry) SortedResults {
 			//Classify using Object SID
 			case "objectSid":
 				for _, sid := range y.ByteValues {
+					//fmt.Printf("%s -- %+v\n", entry.DN, sid)
 
 					var RID [4]uint8
 					for b := range RID {
@@ -166,6 +222,9 @@ func SortResults(result []*ldap.Entry) SortedResults {
 
 					case misc.BuiltInAdministratorsGroup:
 						results.HighValueGroups.BuiltInAdmins = entry
+
+					case misc.BuiltInAdministrator:
+						results.BuiltInAccounts.Administrator = entry
 					}
 
 				}
@@ -178,8 +237,22 @@ func SortResults(result []*ldap.Entry) SortedResults {
 						break
 					}
 				}
+			case "objectCategory":
+				for _, z := range y.Values {
+					if strings.Contains(z, "CN=Person") {
+						OBJCat = OBJCat + misc.OBJCAT_Person
+					}
+				}
 
 			//
+			case "servicePrincipalName":
+				for _, spn := range y.Values {
+					if spn != "" {
+						results.EntriesWithSPN = append(results.EntriesWithSPN, entry)
+						break
+					}
+				}
+
 			case "objectClass":
 				for _, z := range y.Values {
 					switch z {
@@ -212,13 +285,28 @@ func SortResults(result []*ldap.Entry) SortedResults {
 			results.Groups = append(results.Groups, entry)
 		}
 
+		if (OID&misc.OID_User) == misc.OID_User && (OBJCat&misc.OBJCAT_Person) == misc.OBJCAT_Person {
+
+			results.Users = append(results.Users, entry)
+
+		}
 	}
 	return results
 
 }
 
+//Return if Entry is user. For some reason, Domain Controllers have the same objectClasses as people.
+func isTrueUser(entry *ldap.Entry) bool {
+	for _, y := range entry.Attributes {
+		switch y.Name {
+
+		}
+	}
+	return false
+}
+
 //Extract members from group
-func addMembersToResultGroup(entry *ldap.Entry) []string {
+func GetMembersOfGroup(entry *ldap.Entry) []string {
 	var membersArray []string
 	for attributes := range entry.Attributes {
 		if entry.Attributes[attributes].Name == "member" {
@@ -243,5 +331,3 @@ func getOutDatedOS() {}
 
 // Property: serviceprincipalnames
 func getSPNS() {}
-
-func getDescriptions() {}
