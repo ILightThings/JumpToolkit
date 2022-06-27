@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/ilightthings/jumptoolkit/src/jump_ldap_scanner/sorting"
 	"github.com/ilightthings/jumptoolkit/src/misc"
 	"testing"
 )
@@ -72,13 +73,13 @@ func TestExtractAllEntries(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	p := GetUsersFromResults(results.Entries)
+	p := sorting.GetUsersFromResults(results.Entries)
 
 	for x := range p {
 		fmt.Println(p[x].DN)
 	}
 
-	r := SortResults(results.Entries)
+	r := sorting.SortResults(results.Entries)
 
 	for user := range r.Users {
 		fmt.Println(r.Users[user].DN)
