@@ -111,11 +111,10 @@ func SortResults(result []*ldap.Entry) SortedResults {
 
 			//Find Results with Descriptions
 			case "description":
-				for _, descriptions := range y.Values {
-					if descriptions != "" {
-						results.EntriesDescriptions = append(results.EntriesDescriptions, entry)
-						break
-					}
+
+				if y.Values[0] != "" {
+					results.EntriesDescriptions = append(results.EntriesDescriptions, entry)
+					break
 				}
 
 			case "objectCategory":

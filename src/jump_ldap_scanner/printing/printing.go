@@ -11,6 +11,7 @@ type PrettyPrint struct {
 	DisplayName       string
 	DistinguishedName string
 	CN                string
+	Description       string
 	Properties        InterestingProperties
 }
 
@@ -75,17 +76,24 @@ func DisplayResults(r *sorting.SortedResults) {
 	fmt.Println()
 
 	fmt.Println("#Administrators#")
-	for _, p := range r.HighValueGroups.BuiltInAdminMembers {
-		p := ldapNicePrint(p, r)
+	for _, g := range r.HighValueGroups.BuiltInAdminMembers {
+		p := ldapNicePrint(g, r)
 		fmt.Println(p.Glance())
 	}
 	fmt.Println()
 
 	fmt.Println("#Enterprise Admins#")
-	for _, p := range r.HighValueGroups.EnterpriseAdminMembers {
-		p := ldapNicePrint(p, r)
+	for _, g := range r.HighValueGroups.EnterpriseAdminMembers {
+		p := ldapNicePrint(g, r)
 		fmt.Println(p.Glance())
 	}
+
+	/*fmt.Println() //Needs better parsing. Currently matches all machines
+	fmt.Println("#Domain Controllers")
+	for _, d := range r.DomainControllers {
+		p := ldapNicePrint(d, r)
+		fmt.Println(p.Glance())
+	}*/
 
 	fmt.Println()
 	fmt.Println("---Exploitable Accounts---")
@@ -105,6 +113,26 @@ func DisplayResults(r *sorting.SortedResults) {
 		}
 	}
 
+	fmt.Println()
+	fmt.Println("---Informational---")
+
+	fmt.Println("#Users with passwords that don't expire")
+	for _, x := range r.PasswordNoExpire {
+		if inList(x, r.Users) {
+			p := ldapNicePrint(x, r)
+			fmt.Println(p.Glance())
+		}
+	}
+	fmt.Println()
+	fmt.Println("#Users with descriptions")
+	for _, x := range r.EntriesDescriptions {
+		if inList(x, r.Users) {
+			p := ldapNicePrint(x, r)
+			fmt.Printf("%s - %s\n", p.CN, p.Description)
+
+		}
+	}
+
 	fmt.Println(len(r.Machines))
 
 }
@@ -119,6 +147,8 @@ func ldapNicePrint(l *ldap.Entry, r *sorting.SortedResults) PrettyPrint {
 			p.DisplayName = x.Values[0]
 		case "cn":
 			p.CN = x.Values[0]
+		case "description":
+			p.Description = x.Values[0]
 		}
 
 	}
