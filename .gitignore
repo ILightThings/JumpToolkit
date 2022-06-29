@@ -9,7 +9,7 @@
 *.dylib
 .idea
 
-# Test binary, built with `go test -c`
+# Test binary, built with `go test_jump_ldap_scanner.go -c`
 *.test
 
 # Output of the go coverage tool, specifically when used with LiteIDE
@@ -20,3 +20,7 @@
 
 # Go workspace file
 go.work
+
+secrets.json
+src/misc/secrets.go
+src/misc/secrets.go
