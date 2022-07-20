@@ -1,8 +1,14 @@
 # jumptoolkit
  A collection of dropable biniaries for red teamers
 
+---
+To build
 
+```
+make windows
+```
 
+---
 ## Jump_ldap_scanner
 An ldap scanner that find low hanging fruit:
 - Kerberoastable Account
