@@ -48,11 +48,11 @@ func BindLDAP(conn *ldap.Conn, opt *Options) error {
 }
 
 //Build Search LDAP Object
-func buildSearch(opt *Options, filter string) *ldap.SearchRequest {
+func buildSearch(opt *Options, filter string) (*ldap.SearchRequest) {
 	s := ldap.NewSearchRequest(
 		opt.DomainCN,
 		ldap.ScopeWholeSubtree,
-		0,
+		ldap.NeverDerefAliases,
 		0,
 		0,
 		false,
@@ -60,6 +60,7 @@ func buildSearch(opt *Options, filter string) *ldap.SearchRequest {
 		[]string{},
 		nil,
 	)
+
 	return s
 }
 
@@ -67,5 +68,6 @@ func buildSearch(opt *Options, filter string) *ldap.SearchRequest {
 func ExtractAllEntries(conn *ldap.Conn, opt *Options) (*ldap.SearchResult, error) {
 	s := buildSearch(opt, misc.AllEntries)
 	results, err := conn.SearchWithPaging(s, 100)
+
 	return results, err
 }

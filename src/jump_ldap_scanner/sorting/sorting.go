@@ -10,21 +10,24 @@ import (
 
 //Todo, add machine sorting
 type SortedResults struct {
-	DomainControllers    []*ldap.Entry
-	Users                []*ldap.Entry
-	Groups               []*ldap.Entry
-	Machines             []*ldap.Entry
-	EntriesDescriptions  []*ldap.Entry
-	HighValueGroups      BuiltInHighValueGroups
-	BuiltInAccounts      BuiltInAccounts
-	EntriesWithSPN       []*ldap.Entry //Potential Kerberoast
-	PreAuthNotRequired   []*ldap.Entry //AS-REPROAST
-	TrustedForDelegation []*ldap.Entry
-	TrustedToDelegate    []*ldap.Entry
-	PasswordNoExpire     []*ldap.Entry
-	PasswordNotRequired  []*ldap.Entry
-	PasswordCannotChange []*ldap.Entry
-	AccountDisabled      []*ldap.Entry
+	DomainControllers           []*ldap.Entry
+	Users                       []*ldap.Entry
+	Groups                      []*ldap.Entry
+	Machines                    []*ldap.Entry
+	EntriesDescriptions         []*ldap.Entry
+	HighValueGroups             BuiltInHighValueGroups
+	BuiltInAccounts             BuiltInAccounts
+	EntriesWithSPN              []*ldap.Entry //Potential Kerberoast
+	PreAuthNotRequired          []*ldap.Entry //AS-REPROAST
+	TrustedForDelegation        []*ldap.Entry
+	TrustedToDelegate           []*ldap.Entry
+	PasswordNoExpire            []*ldap.Entry
+	PasswordNotRequired         []*ldap.Entry
+	PasswordCannotChange        []*ldap.Entry
+	AccountDisabled             []*ldap.Entry
+	FineGrainedPasswordPolicies []*ldap.Entry //This is differnt. Define with class msDS-PasswordSettings
+	LockoutPolicies             []*ldap.Entry
+	PasswordPolicies            []*ldap.Entry
 }
 
 type BuiltInHighValueGroups struct {
@@ -40,6 +43,10 @@ type BuiltInAccounts struct {
 	Krbtgt        *ldap.Entry
 	Administrator *ldap.Entry
 	Guest         *ldap.Entry
+}
+
+func GetFineGrainedPasswordPolicy(r *SortedResults, result []*ldap.Entry) {
+
 }
 
 func GetUsersFromResults(r *SortedResults, result []*ldap.Entry) {
@@ -80,9 +87,24 @@ func SortResults(result []*ldap.Entry) SortedResults {
 		OID := 0
 		OBJCat := 0
 		UAC := 0
+		lockoutsetting := 0
+		passpolicy := 0
 
 		for _, y := range entry.Attributes {
 			switch y.Name {
+
+			case "lockoutDuration":
+				lockoutsetting++
+			case "lockOutObservationWindow":
+				lockoutsetting++
+			case "lockoutThreshold":
+				lockoutsetting++
+			case "maxPwdAge":
+				lockoutsetting++
+			case "minPwdAge":
+				lockoutsetting++
+			case "minPwdLength":
+				lockoutsetting++
 
 			//Classify using Object SID
 			case "objectSid":
@@ -165,9 +187,18 @@ func SortResults(result []*ldap.Entry) SortedResults {
 						OID = OID + misc.OID_Computer
 					case "group":
 						OID = OID + misc.OID_Group
+					case "msDS-PasswordSettings":
+						OID = OID + misc.OID_PasswordPolicies
 					}
 				}
 			}
+		}
+
+		if lockoutsetting > 0 {
+			results.LockoutPolicies = append(results.LockoutPolicies, entry)
+		}
+		if passpolicy > 0 {
+			results.PasswordPolicies = append(results.PasswordPolicies, entry)
 		}
 
 		//Get Domain Controllers
@@ -184,6 +215,9 @@ func SortResults(result []*ldap.Entry) SortedResults {
 
 		if (OID&misc.OID_Computer) == misc.OID_Computer && (OBJCat&misc.OBJCAT_Computer) == misc.OBJCAT_Computer {
 			results.Machines = append(results.Machines, entry)
+		}
+		if (OID & misc.OID_PasswordPolicies) == misc.OID_PasswordPolicies {
+			results.FineGrainedPasswordPolicies = append(results.FineGrainedPasswordPolicies, entry)
 		}
 
 		if (UAC & misc.UAC_DONT_REQ_PREAUTH) == misc.UAC_DONT_REQ_PREAUTH {
