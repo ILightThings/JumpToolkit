@@ -1,8 +1,14 @@
 # jumptoolkit
  A collection of dropable biniaries for red teamers
 
+---
+To build
 
+```
+make windows
+```
 
+---
 ## Jump_ldap_scanner
 An ldap scanner that find low hanging fruit:
 - Kerberoastable Account
@@ -29,9 +35,7 @@ A port scanning tool that can be dropped on a victim computer
 ## Jump_PTR_Lookup
 A DNS Bruteforce scanner that does a reverse IP lookup for every IP scanner.
 
-### TODO
-- [ ] Add output file
-- 
+
 ## Jump_share_scanner
 A SMB Share scanner that can detect read and write permissions from the supplied user.
 
@@ -40,9 +44,3 @@ A SMB Share scanner that can detect read and write permissions from the supplied
 - [ ] File Scanning
 - [ ] Authenticate Via hash
 - [ ] Lnk,SCF and URL Dropper
-
-## Ideas to implement
-- [x] SMB Scanner
-  - A scanner that looks for SMB Shares (Include C$, Admin$, IPC$)
-  - Show pwned if access to Admin$
-  - Accept Hash?
