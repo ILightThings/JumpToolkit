@@ -22,7 +22,7 @@ var (
 
 //LDAP search Queries
 var (
-	AllEntries = "(cn=*)"
+	AllEntries = "(distinguishedName=*)"
 )
 
 //TODO COMPLETE THIS
@@ -37,6 +37,7 @@ const (
 	OID_Person               = 0x20
 	OID_Computer             = 0x40
 	OID_Group                = 0x80
+	OID_PasswordPolicies     = 0x160
 )
 
 //LDAP OID Favourites

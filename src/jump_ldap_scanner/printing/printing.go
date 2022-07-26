@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"github.com/go-ldap/ldap/v3"
 	"github.com/ilightthings/jumptoolkit/src/jump_ldap_scanner/sorting"
+	"log"
+	"strconv"
 	"strings"
 )
 
@@ -26,6 +28,16 @@ type InterestingProperties struct {
 	PasswordNoChange   bool
 	PasswordNoRequired bool
 	PasswordNoExpire   bool
+}
+
+//THERE IS A DIFFERENCE BETWEEN A PASSWORD POLICY AND A FINE GRAINED PASSWORD POLICY
+type PassPol struct {
+	PolicyName            string
+	AppliesTo             string
+	PasswordComplexity    bool //ms-DS-Password-Complexity-Enabled
+	LockoutThreshold      int
+	LockoutDuration       int //https://docs.microsoft.com/en-us/windows/win32/adschema/a-msds-lockoutduration
+	MinimumPasswordLength int
 }
 
 func (p *PrettyPrint) Glance() string {
@@ -70,8 +82,8 @@ func DisplayResults(r *sorting.SortedResults) {
 	fmt.Println("---Members of High Value Groups---")
 	fmt.Println("#DOMAIN ADMINS#")
 	for _, p := range r.HighValueGroups.DomainAdminsMembers {
-		p := ldapNicePrint(p, r)
-		fmt.Println(p.Glance())
+		l := ldapNicePrint(p, r)
+		fmt.Println(l.Glance())
 	}
 	fmt.Println()
 
@@ -133,7 +145,19 @@ func DisplayResults(r *sorting.SortedResults) {
 		}
 	}
 
-	fmt.Println(len(r.Machines))
+	fmt.Println()
+	fmt.Println("# Domain Objects with password policies")
+	fmt.Println("---Fine Grained---")
+	for _, x := range r.FineGrainedPasswordPolicies {
+		PrintFineGrainedPasswordPolicy(x)
+
+	}
+	fmt.Println("---DC default policy (potentally default)---")
+	for _, y := range r.LockoutPolicies {
+		printPassPolicy(y)
+	}
+
+	fmt.Println(len(r.FineGrainedPasswordPolicies))
 
 }
 
@@ -185,4 +209,128 @@ func inHighValue(l *ldap.Entry, r *sorting.SortedResults) bool {
 	}
 	return false
 
+}
+
+type PasswordPolicy struct {
+	ObjectName             string
+	passwordLength         string
+	passwordMinAge         string
+	passwordMaxAge         string
+	lockoutDuration        string
+	lockoutOberservation   string
+	lockoutThreshold       string
+	passwordComplexity     string
+	passwordHistory        string
+	passwordReverseAble    string
+	PasswordPolicyPriority string
+	PolicyAppliesTo        []string
+}
+
+func printPassPolicy(l *ldap.Entry) {
+	var classPolicy PasswordPolicy
+	for _, x := range l.Attributes {
+		switch x.Name {
+		case "distinguishedName":
+			classPolicy.ObjectName = x.Values[0]
+		case "lockoutDuration":
+			classPolicy.lockoutDuration = x.Values[0]
+		case "lockOutObservationWindow":
+			classPolicy.lockoutOberservation = x.Values[0]
+		case "lockoutThreshold":
+			classPolicy.lockoutThreshold = x.Values[0]
+		case "maxPwdAge":
+			classPolicy.passwordMaxAge = x.Values[0]
+		case "minPwdAge":
+			classPolicy.passwordMinAge = x.Values[0]
+		case "minPwdLength":
+			classPolicy.passwordLength = x.Values[0]
+		}
+
+	}
+	fmt.Printf(`%s
+	Lockout Theshold: %d
+	Lockout Duration: %d
+	Lockout Observation: %d
+
+	Password Minimum Length: %s
+	Password Minimum Age: %d
+	Password Maximum Age: %d
+
+`,
+		classPolicy.ObjectName,
+		setVar(classPolicy.lockoutThreshold),
+		setVar(classPolicy.lockoutDuration)/-600000000,
+		setVar(classPolicy.lockoutOberservation)/-600000000,
+		classPolicy.passwordLength,
+		setVar(classPolicy.passwordMinAge)/-600000000/60/24,
+		setVar(classPolicy.passwordMaxAge)/-600000000/60/24,
+	)
+}
+
+func PrintFineGrainedPasswordPolicy(l *ldap.Entry) {
+	var classPolicy PasswordPolicy
+	for _, x := range l.Attributes {
+		switch x.Name {
+		case "distinguishedName":
+			classPolicy.ObjectName = x.Values[0]
+		case "msDS-LockoutDuration":
+			classPolicy.lockoutDuration = x.Values[0]
+		case "msDS-LockoutObservationWindow":
+			classPolicy.lockoutOberservation = x.Values[0]
+		case "msDS-LockoutThreshold":
+			classPolicy.lockoutThreshold = x.Values[0]
+		case "msDS-MaximumPasswordAge":
+			classPolicy.passwordMaxAge = x.Values[0]
+		case "msDS-MinimumPasswordAge":
+			classPolicy.passwordMinAge = x.Values[0]
+		case "msDS-MinimumPasswordLength":
+			classPolicy.passwordLength = x.Values[0]
+		case "msDS-PasswordComplexityEnabled":
+			classPolicy.passwordComplexity = x.Values[0]
+		case "msDS-PasswordHistoryLength":
+			classPolicy.passwordHistory = x.Values[0]
+		case "msDS-PasswordReversibleEncryptionEnabled":
+			classPolicy.PasswordPolicyPriority = x.Values[0]
+		case "msDS-PSOAppliesTo":
+			classPolicy.PolicyAppliesTo = x.Values
+		case "msDS-PasswordSettingsPrecedence":
+			classPolicy.PasswordPolicyPriority = x.Values[0]
+		}
+	}
+	fmt.Printf(`%s
+	Lockout Theshold: %d
+	Lockout Duration: %d
+	Lockout Observation: %d
+
+	Password Minimum Length: %d
+	Password Minimum Age: %d
+	Password Maximum Age: %d
+	Password Complexity: %s
+	
+	Policy Priority: %d
+	Policy Applies to:
+`,
+		classPolicy.ObjectName,
+		setVar(classPolicy.lockoutThreshold),
+		setVar(classPolicy.lockoutDuration)/-600000000,
+		setVar(classPolicy.lockoutOberservation)/-600000000,
+		setVar(classPolicy.passwordLength),
+		setVar(classPolicy.passwordMinAge)/-600000000/60/24,
+		setVar(classPolicy.passwordMaxAge)/-600000000/60/24,
+		classPolicy.passwordComplexity,
+		setVar(classPolicy.PasswordPolicyPriority),
+	)
+	for _, affected := range classPolicy.PolicyAppliesTo {
+		fmt.Printf("\t\t%s\n", affected)
+	}
+	fmt.Println()
+
+}
+
+func setVar(s string) int {
+	number, err := strconv.Atoi(s)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return number
 }
