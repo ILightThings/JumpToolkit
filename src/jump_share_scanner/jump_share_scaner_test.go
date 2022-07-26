@@ -20,5 +20,4 @@ func TestAuthHost(t *testing.T) {
 	o := GenCred()
 	hosts := TestHosts(&o)
 	PrettyPrint(hosts, &o)
-
 }

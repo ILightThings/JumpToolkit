@@ -1,6 +1,7 @@
 # If you prefer the allow list template instead of the deny list, see community template:
 # https://github.com/github/gitignore/blob/main/community/Golang/Go.AllowList.gitignore
 #
+*test.go
 # Binaries for programs and plugins
 *.exe
 *.exe~
@@ -23,9 +24,9 @@ go.work
 
 secrets.json
 src/misc/secrets.go
-src/misc/secrets.go
 
-*_test.go
+
+
 src/jump_share_scanner/jump_share_scaner_test.go
-src/jump_share_scanner/jump_share_scaner_test.go
+
 src/jump_share_scanner/jump_share_scaner_test.go
