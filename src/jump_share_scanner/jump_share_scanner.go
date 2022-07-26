@@ -1,9 +1,12 @@
-package jump_share_scanner
+package main
 
 import (
 	"fmt"
 	smb2 "github.com/LeakIX/go-smb2"
 	"github.com/LeakIX/ntlmssp"
+	"github.com/akamensky/argparse"
+	"github.com/ilightthings/jumptoolkit/src/inputparse"
+	"log"
 	"net"
 	"os"
 	"time"
@@ -23,14 +26,18 @@ const (
 	MOUNT_NOT_TESTED        = 4
 )
 
+//TODO, set up levels of logging for debugging
+//TODO, have a guest access check as well
+
 type Options struct {
 	Username            string
 	Password            string
-	NTLM_hash           string
 	Domain              string
 	Port                int
 	Hosts               []string
-	TestWriteAccessName string
+	TestWriteAccessName string //Name of file to write and then delete from disk.
+	Verbosity           int    //TODO Implement verbosity
+	Timing              int    //TODO implement levels
 }
 
 type Host struct {
@@ -49,9 +56,42 @@ type ShareFolder struct {
 	AccessResult int
 }
 
-func main() {}
+func main() {
+	//TODO Add option to not test Read/Write
+	//TODO Add Multi Threading
 
-func CreateHost(options *Options) []*Host {
+	parser := argparse.NewParser("jump_share_scanner", "A share scanner that will detect and test network shares.")
+	hostarg := parser.String("t", "target", &argparse.Options{Required: true, Help: "IPv4 to target. Single, CIDR, comma seperated"})
+	portarg := parser.Int("P", "port", &argparse.Options{Required: false, Default: 445, Help: "Port to scan for SMB Shares"})
+	usernamearg := parser.String("u", "username", &argparse.Options{Required: false, Default: "guest", Help: "Username to authenticate with"})
+	passwordarg := parser.String("p", "password", &argparse.Options{Required: false, Default: "", Help: "Password to authenticate with"})
+	domainarg := parser.String("d", "domain", &argparse.Options{Required: false, Default: ".", Help: "domain to authenticate with"})
+	testfilearg := parser.String("f", "filename", &argparse.Options{Required: false, Default: ".msds_info", Help: "name of the test file to write to disk (Useful for logging)"})
+
+	err := parser.Parse(os.Args)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	valHost, err := inputparse.ParseHost(*hostarg)
+	if err != nil {
+		log.Fatal(err)
+	}
+	UserOptions := Options{
+		Hosts:               valHost,
+		Username:            *usernamearg,
+		Password:            *passwordarg,
+		Domain:              *domainarg,
+		TestWriteAccessName: *testfilearg,
+		Port:                *portarg,
+	}
+
+	Results := TestHosts(&UserOptions)
+	PrettyPrint(Results, &UserOptions)
+
+}
+
+func TestHosts(options *Options) []*Host {
 	var HostsList []*Host
 	for _, hostEntry := range options.Hosts {
 		newHost := &Host{IpAddr: hostEntry}
@@ -62,14 +102,14 @@ func CreateHost(options *Options) []*Host {
 		if err != nil {
 			continue
 		}
-		defer newHost.Connection.Close()
+		defer newHost.Connection.Close() // Defer closing the dial connection
 
 		//SMB Autenticate to host
 		err = newHost.AuthHost(options)
 		if err != nil {
 			continue
 		}
-		defer newHost.SMBSession.Logoff()
+		defer newHost.SMBSession.Logoff() // Defer closing the session
 
 		//Get Shares
 		err = newHost.GetShares(options)
@@ -118,6 +158,7 @@ func (h *Host) AuthHost(options *Options) error {
 	s, err := smbservice.Dial(h.Connection)
 	if err == nil {
 		h.Authenticated = true
+		fmt.Printf("Authentication to %s Successful\n", h.IpAddr)
 	} else {
 		fmt.Printf("Error Authenticating Host %s\n", h.IpAddr)
 	}
@@ -140,6 +181,7 @@ func (h *Host) GetShares(options *Options) error {
 	return err
 }
 
+//Test Share access using current session
 func (h *Host) TestShareAccess(options *Options) {
 	for sharename := range h.Shares {
 		result := MountShare(h, h.Shares[sharename].ShareName, options)
@@ -204,13 +246,15 @@ func DeleteWrite(FileShare *smb2.Share, options *Options) error {
 
 //Pretty print
 func PrettyPrint(hostresults []*Host, options *Options) {
+
+	fmt.Println("### RESULTS ###")
 	for x := range hostresults {
 		if hostresults[x].TCPReachable == false {
 			fmt.Printf("Host %s is unreachable\n\n", hostresults[x].IpAddr)
 			continue
 		}
 		if hostresults[x].Authenticated == false {
-			fmt.Printf("Host %s failed to authenticate with %s\\%s\n\n", options.Domain, options.Domain, options.Username)
+			fmt.Printf("Host %s failed to authenticate with %s\\%s\n\n", hostresults[x].IpAddr, options.Domain, options.Username)
 			continue
 		}
 
@@ -223,6 +267,7 @@ func PrettyPrint(hostresults []*Host, options *Options) {
 	}
 }
 
+//Return string of write access level
 func NicePrint(access_int int) string {
 	switch access_int {
 	case MOUNT_NO_ACCESS:

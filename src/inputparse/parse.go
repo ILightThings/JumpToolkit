@@ -14,6 +14,7 @@ import (
 
 //Parse host from string. Input could be single host (10.0.0.0), CIDR Notation (172.16.0.0/16), or comma seperated (192.168.1.1,192.168.1.3,192.168.1.5)
 func ParseHost(host string) ([]string, error) {
+
 	v := validator.New()
 	var p []string
 
@@ -34,8 +35,10 @@ func ParseHost(host string) ([]string, error) {
 		return p, nil
 	}
 
+	//TODO, logging
 	//Comma seperated
 	if strings.Contains(host, ",") {
+		
 		potentialTarget := strings.Split(host, ",")
 		for ahost := range potentialTarget {
 			potentialTarget[ahost] = strings.TrimSpace(potentialTarget[ahost])

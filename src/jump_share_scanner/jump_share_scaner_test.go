@@ -1,4 +1,4 @@
-package jump_share_scanner
+package main
 
 import (
 	"testing"
@@ -18,7 +18,7 @@ func GenCred() Options {
 
 func TestAuthHost(t *testing.T) {
 	o := GenCred()
-	hosts := CreateHost(&o)
+	hosts := TestHosts(&o)
 	PrettyPrint(hosts, &o)
 
 }

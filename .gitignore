@@ -28,3 +28,4 @@ src/misc/secrets.go
 *_test.go
 src/jump_share_scanner/jump_share_scaner_test.go
 src/jump_share_scanner/jump_share_scaner_test.go
+src/jump_share_scanner/jump_share_scaner_test.go
