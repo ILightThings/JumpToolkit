@@ -44,3 +44,9 @@ A SMB Share scanner that can detect read and write permissions from the supplied
 - [ ] File Scanning
 - [ ] Authenticate Via hash
 - [ ] Lnk,SCF and URL Dropper
+
+
+### IDEAS
+Test ADMIN$ read access to test creds <- Kind Detectable.....
+
+

@@ -7,6 +7,11 @@ import (
 	"strings"
 )
 
+// TODO, Get machine account quota
+// ms-DS-MachineAccountQuota
+
+// TODO, Seperate Unconstrained Delegation, and Contrained Delegatation
+//
 type Options struct {
 	Username string
 	Password string
@@ -48,7 +53,7 @@ func BindLDAP(conn *ldap.Conn, opt *Options) error {
 }
 
 //Build Search LDAP Object
-func buildSearch(opt *Options, filter string) (*ldap.SearchRequest) {
+func buildSearch(opt *Options, filter string) *ldap.SearchRequest {
 	s := ldap.NewSearchRequest(
 		opt.DomainCN,
 		ldap.ScopeWholeSubtree,

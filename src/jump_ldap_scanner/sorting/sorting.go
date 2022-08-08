@@ -9,6 +9,7 @@ import (
 )
 
 //Todo, add machine sorting
+//Todo, find machines with the SQL SPN
 type SortedResults struct {
 	DomainControllers           []*ldap.Entry
 	Users                       []*ldap.Entry
@@ -19,8 +20,8 @@ type SortedResults struct {
 	BuiltInAccounts             BuiltInAccounts
 	EntriesWithSPN              []*ldap.Entry //Potential Kerberoast
 	PreAuthNotRequired          []*ldap.Entry //AS-REPROAST
-	TrustedForDelegation        []*ldap.Entry
-	TrustedToDelegate           []*ldap.Entry
+	TrustedForDelegation        []*ldap.Entry // Unconstrained Delegation
+	TrustedToDelegate           []*ldap.Entry // Constrained Delegation
 	PasswordNoExpire            []*ldap.Entry
 	PasswordNotRequired         []*ldap.Entry
 	PasswordCannotChange        []*ldap.Entry
@@ -228,8 +229,12 @@ func SortResults(result []*ldap.Entry) SortedResults {
 			results.PasswordNoExpire = append(results.PasswordNoExpire, entry)
 		}
 
-		if (UAC & misc.UAC_TRUSTED_TO_AUTH_FOR_DELEGATION) == misc.UAC_TRUSTED_TO_AUTH_FOR_DELEGATION {
+		if (UAC & misc.UAC_TRUSTED_TO_AUTH_FOR_DELEGATION) == misc.UAC_TRUSTED_TO_AUTH_FOR_DELEGATION { //Constrained Delegation
 			results.TrustedToDelegate = append(results.TrustedToDelegate, entry)
+		}
+
+		if (UAC & misc.UAC_TRUSTED_FOR_DELEGATION) == misc.UAC_TRUSTED_FOR_DELEGATION { //UnConstrained Delegation
+			results.TrustedForDelegation = append(results.TrustedForDelegation, entry)
 		}
 
 		if (UAC & misc.UAC_PASSWD_NOTREQD) == misc.UAC_PASSWD_NOTREQD {

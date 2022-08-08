@@ -18,16 +18,17 @@ type PrettyPrint struct {
 }
 
 type InterestingProperties struct {
-	User               bool
-	Group              bool
-	Machine            bool
-	SPNs               bool
-	NoPreAuth          bool
-	HighValueMember    bool
-	TrustedToDelegate  bool
-	PasswordNoChange   bool
-	PasswordNoRequired bool
-	PasswordNoExpire   bool
+	User                 bool
+	Group                bool
+	Machine              bool
+	SPNs                 bool
+	NoPreAuth            bool
+	HighValueMember      bool
+	TrustedToDelegate    bool
+	TrustedForDelegation bool
+	PasswordNoChange     bool
+	PasswordNoRequired   bool
+	PasswordNoExpire     bool
 }
 
 //THERE IS A DIFFERENCE BETWEEN A PASSWORD POLICY AND A FINE GRAINED PASSWORD POLICY
@@ -68,8 +69,12 @@ func (p *PrettyPrint) Glance() string {
 	if p.Properties.User && p.Properties.PasswordNoRequired {
 		glance = append(glance, "[Pass not Required]")
 	}
+	if p.Properties.TrustedForDelegation {
+		glance = append(glance, "[Unconstrained Delegation]")
+	}
+
 	if p.Properties.TrustedToDelegate {
-		glance = append(glance, "[Trusted to Delegate")
+		glance = append(glance, "[Constrained Delegation]")
 	}
 
 	return strings.Join(glance, " ")
@@ -114,6 +119,8 @@ func DisplayResults(r *sorting.SortedResults) {
 		if inList(x, r.Users) {
 			p := ldapNicePrint(x, r)
 			fmt.Println(p.Glance())
+			printAtributeValues(x, "servicePrincipalName")
+
 		}
 	}
 	fmt.Println()
@@ -122,6 +129,25 @@ func DisplayResults(r *sorting.SortedResults) {
 		if inList(x, r.Users) {
 			p := ldapNicePrint(x, r)
 			fmt.Println(p.Glance())
+		}
+	}
+
+	fmt.Println()
+	fmt.Println("#Unconstrained Delegation")
+	for _, x := range r.TrustedForDelegation {
+		if inList(x, r.Machines) {
+			p := ldapNicePrint(x, r)
+			fmt.Println(p.Glance())
+		}
+	}
+
+	fmt.Println()
+	fmt.Println("#Constrained Delegation")
+	for _, x := range r.TrustedToDelegate {
+		if inList(x, r.Machines) {
+			p := ldapNicePrint(x, r)
+			fmt.Println(p.Glance())
+			printAtributeValues(x, "msds-allowedtodelegateto")
 		}
 	}
 
@@ -183,10 +209,13 @@ func ldapNicePrint(l *ldap.Entry, r *sorting.SortedResults) PrettyPrint {
 	p.Properties.PasswordNoExpire = inList(l, r.PasswordNoExpire)
 	p.Properties.HighValueMember = inHighValue(l, r)
 	p.Properties.Machine = inList(l, r.Machines)
+	p.Properties.TrustedForDelegation = inList(l, r.TrustedForDelegation) //UnConstrained Delegation
+	p.Properties.TrustedToDelegate = inList(l, r.TrustedToDelegate)       //ContrainedDelegation
 	return p
 
 }
 
+// Find all all groups a result is in.
 func inList(l *ldap.Entry, r []*ldap.Entry) bool {
 	for _, x := range r {
 		if l == x {
@@ -333,4 +362,14 @@ func setVar(s string) int {
 		log.Fatal(err)
 	}
 	return number
+}
+
+func printAtributeValues(l *ldap.Entry, value string) {
+	for _, x := range l.Attributes {
+		if x.Name == value {
+			for _, name := range x.Values {
+				fmt.Printf("\t%s\n", name)
+			}
+		}
+	}
 }

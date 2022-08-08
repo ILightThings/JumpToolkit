@@ -68,12 +68,12 @@ const ( //https://docs.microsoft.com/en-us/troubleshoot/windows-server/identity/
 	UAC_DONT_EXPIRE_PASSWORD           = 0x10000
 	UAC_MNS_LOGON_ACCOUNT              = 0x20000
 	UAC_SMARTCARD_REQUIRED             = 0x40000
-	UAC_TRUSTED_FOR_DELEGATION         = 0x80000
+	UAC_TRUSTED_FOR_DELEGATION         = 0x80000 //Unconstrained Delegation
 	UAC_NOT_DELEGATED                  = 0x100000
 	UAC_USE_DES_KEY_ONLY               = 0x200000
 	UAC_DONT_REQ_PREAUTH               = 0x400000
 	UAC_PASSWORD_EXPIRED               = 0x800000
-	UAC_TRUSTED_TO_AUTH_FOR_DELEGATION = 0x1000000
+	UAC_TRUSTED_TO_AUTH_FOR_DELEGATION = 0x1000000 // Constrained Delegation
 	UAC_PARTIAL_SECRETS_ACCOUNT        = 0x04000000
 )
 

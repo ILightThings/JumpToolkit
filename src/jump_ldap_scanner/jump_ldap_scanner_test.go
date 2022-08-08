@@ -2,16 +2,17 @@ package main
 
 import (
 	"fmt"
+	"github.com/ilightthings/jumptoolkit/src/jump_ldap_scanner/jump_ldap"
 	"github.com/ilightthings/jumptoolkit/src/jump_ldap_scanner/sorting"
 	"github.com/ilightthings/jumptoolkit/src/misc"
 	"testing"
 )
 
-func GenOptions() Options {
-	opt := Options{
-		username:   misc.Ldapusername,
-		password:   misc.Ldappassword,
-		domain:     misc.LdapDNSDomain,
+func GenOptions() jump_ldap.Options {
+	opt := jump_ldap.Options{
+		Username:   misc.Ldapusername,
+		Password:   misc.Ldappassword,
+		Domain:     misc.LdapDNSDomain,
 		LDAPIPaddr: misc.DCIPAddr,
 		LDAPPort:   389,
 	}
@@ -21,7 +22,7 @@ func GenOptions() Options {
 
 func TestDialLDAP(t *testing.T) {
 	opt := GenOptions()
-	_, err := DialLDAP(&opt)
+	_, err := jump_ldap.DialLDAP(&opt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -31,11 +32,11 @@ func TestDialLDAP(t *testing.T) {
 func TestAnonymousBind(t *testing.T) {
 	opt := GenOptions()
 
-	ldapconn, err := DialLDAP(&opt)
+	ldapconn, err := jump_ldap.DialLDAP(&opt)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = AnonymousBind(ldapconn)
+	err = jump_ldap.AnonymousBind(ldapconn)
 	if err != nil {
 		t.Error(err)
 	}
@@ -45,12 +46,12 @@ func TestAnonymousBind(t *testing.T) {
 func TestBindLDAP(t *testing.T) {
 	opt := GenOptions()
 	opt.BuildCN()
-	ldapconn, err := DialLDAP(&opt)
+	ldapconn, err := jump_ldap.DialLDAP(&opt)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = BindLDAP(ldapconn, &opt)
+	err = jump_ldap.BindLDAP(ldapconn, &opt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -60,24 +61,21 @@ func TestBindLDAP(t *testing.T) {
 func TestExtractAllEntries(t *testing.T) {
 	opt := GenOptions()
 	opt.BuildCN()
-	ldapconn, err := DialLDAP(&opt)
+	ldapconn, err := jump_ldap.DialLDAP(&opt)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = BindLDAP(ldapconn, &opt)
+	err = jump_ldap.BindLDAP(ldapconn, &opt)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	results, err := ExtractAllEntries(ldapconn, &opt)
+	results, err := jump_ldap.ExtractAllEntries(ldapconn, &opt)
 	if err != nil {
 		t.Fatal(err)
 	}
-	p := sorting.GetUsersFromResults(results.Entries)
-
-	for x := range p {
-		fmt.Println(p[x].DN)
-	}
+	var people sorting.SortedResults
+	sorting.GetUsersFromResults(&people, results.Entries)
 
 	r := sorting.SortResults(results.Entries)
 
